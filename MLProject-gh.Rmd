@@ -1,0 +1,95 @@
+---
+title: "Machine Learing Project"
+author: "Alpha"
+date: "18. Juli 2015"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+#Machine Learing Project
+
+#Libraries
+library(caret); library(lattice); library(ggplot2)
+library(data.table); library(plyr); library(dplyr)
+library(randomForest)
+
+#Loading data files
+setwd("./R")
+missing = c("NA","#DIV/0!", "");
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileUrl, destfile = "./train1.csv", method = "libcurl")
+train1 <- read.csv("./train1.csv", na.strings = missing)
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileUrl, destfile = "./test1.csv", method = "libcurl")
+test1 <- read.csv("./test1.csv", na.strings = missing)
+
+#Subsetting, NA removal, PCA
+set.seed(1234)
+inTrain <- createDataPartition(y = train1$classe, p = 0.5, list = FALSE)
+train2 <- train1[inTrain, ]
+test2 <- train1[-inTrain, ]
+
+train3 <- train2[colSums(is.na(train2)) == 0]
+test3 <- test2[colSums(is.na(test2)) == 0]
+
+train4 <- select(train3, -contains("timestamp"), -ends_with("window"), -starts_with("user"), -X)
+test4 <- select(test3, -contains("timestamp"), -ends_with("window"), -starts_with("user"), -X)
+
+dim(train2); dim(train4)
+
+#Tree model
+modtr <- train(classe ~ ., data = train4, method = "rpart")
+predtr.train <- predict(modtr,train4)
+predtr.test <- predict(modtr,test4)
+cmtr.train <- confusionMatrix(predtr.train, train4$classe)
+cmtr.test <- confusionMatrix(predtr.test, test4$classe)
+#Accuracy cmtr.train = 0.4967
+#Accuracy cmtr.test = 0.4938
+
+#Random forest model
+modrf <- train(classe ~ ., data = train4, method = "rf", trControl = trainControl(method = "cv", number = 4), ntree = 100, importance = TRUE)
+predrf.train <- predict(modrf,train4)
+predrf.test <- predict(modrf,test4)
+cmrf.train <- confusionMatrix(predrf.train, train4$classe)
+cmrf.test <- confusionMatrix(predrf.test, test4$classe)
+#Accuracy cmrf.train = 1.000
+#Accuracy cmfr.test = 0.9892, therefore selected model
+
+#20 test predictions
+pred3 <- test1[colSums(is.na(test1)) == 0]
+pred4 <- select(pred3, -contains("timestamp"), -ends_with("window"), -starts_with("user"), -X)
+dim(test1); dim(pred4)
+predrf.pred <- predict(modrf,pred4)
+predrf.pred 
+#[1] B A B A A E D B A A B C B A E E A B B B
+#Levels: A B C D E
+
+#Submitting answers
+x <- as.vector(predrf.pred) 
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)
+
+#EOC
